@@ -1,33 +1,65 @@
 import fs from 'fs'
 import path from 'path'
 
-import { useContext } from 'react'
-
+import chainSpec from 'data/chainspec.json'
 import matter from 'gray-matter'
 import type { NextPage } from 'next'
 import getConfig from 'next/config'
 import Head from 'next/head'
 import { serialize } from 'next-mdx-remote/serialize'
-import { IItemDocs, IGasDocs, IDocMeta } from 'types'
-
-import { EthereumContext } from 'context/ethereumContext'
+import { IItemDocs, IGasDocs, IDocMeta, IReferenceItem } from 'types'
 
 import ContributeBox from 'components/ContributeBox'
-import EvmStorageBanner from 'components/EvmStorageBanner'
 import HomeLayout from 'components/layouts/Home'
 import ReferenceTable from 'components/Reference'
 import { H1, Container } from 'components/ui'
 
 const { serverRuntimeConfig } = getConfig()
 
+const opcodeRewrites: { [key: string]: string } = {
+  ret: 'ret_contract',
+  rvrt: 'rvrt_contract',
+  retd: 'retd_contract',
+  cfe: 'cfei',
+  cfs: 'cfsi',
+  ecal: 'call',
+}
+
 const HomePage = ({
   opcodeDocs,
   gasDocs,
+  instructions,
 }: {
   opcodeDocs: IItemDocs
   gasDocs: IGasDocs
+  instructions: any[]
 }) => {
-  const { opcodes } = useContext(EthereumContext)
+  const opcodes = instructions.map((instruction): IReferenceItem => {
+    const opcodeRewritten =
+      opcodeRewrites[instruction.opcode.toLowerCase()] ||
+      instruction.opcode.toLowerCase()
+    const costItem = (chainSpec.consensus_parameters.V1.gas_costs.V1 as any)[
+      opcodeRewritten
+    ]
+    if (!costItem) {
+      console.error(`Missing gas cost for ${instruction.opcode}`)
+    }
+
+    return {
+      name: instruction.opcode,
+      opcodeOrAddress: instruction.instruction,
+      description: instruction.description,
+      input: instruction.registers
+        .map((register: any) => register.name)
+        .join(' | '),
+      output: '',
+      minimumFee:
+        costItem.LightOperation?.base ||
+        costItem.HeavyOperation?.base ||
+        costItem,
+    }
+  })
+  console.log(opcodes)
 
   return (
     <>
@@ -36,14 +68,20 @@ const HomePage = ({
         <meta property="og:title" content="EVM Codes - Opcodes" />
         <meta
           name="description"
-          content="An Ethereum Virtual Machine Opcodes Interactive Reference"
+          content="A Fuel Virtual Machine Opcodes Interactive Reference"
         />
       </Head>
-      <EvmStorageBanner />
       <Container>
         <H1>
-          An Ethereum Virtual Machine <br></br> Opcodes Interactive Reference
+          A Fuel Virtual Machine Virtual Machine <br></br> Opcodes Interactive
+          Reference
         </H1>
+        <div style={{ textAlign: 'center' }}>
+          Forked from{' '}
+          <a href="https://www.evm.codes/" target="_blank" rel="noreferrer">
+            evm.codes
+          </a>
+        </div>
       </Container>
 
       <section className="py-10 md:py-20 bg-gray-50 dark:bg-black-700">
@@ -73,6 +111,33 @@ export const getStaticProps = async () => {
 
   const opcodeDocs: IItemDocs = {}
   const gasDocs: IGasDocs = {}
+
+  const instructionsRs = await fetch(
+    'https://github.com/FuelLabs/fuel-vm/raw/master/fuel-asm/src/lib.rs',
+  ).then((res) => res.text())
+  const instructions = []
+  const iterator = instructionsRs.matchAll(
+    /"(.+)"\s+0x(\w+) (\w+) (\w+) \[(.+)\]/g,
+  )
+  for (const [
+    ,
+    description,
+    instruction,
+    opcode,
+    opcodeSmall,
+    registers,
+  ] of iterator) {
+    const registerList = Array.from(registers.matchAll(/(\w+): (\w+)/g)).map(
+      ([, name, type]) => ({ name, type }),
+    )
+    instructions.push({
+      description,
+      instruction,
+      opcode,
+      registers: registerList,
+      opcodeSmall,
+    })
+  }
 
   await Promise.all(
     docs.map(async (doc) => {
@@ -115,6 +180,7 @@ export const getStaticProps = async () => {
     props: {
       opcodeDocs,
       gasDocs,
+      instructions,
     },
   }
 }

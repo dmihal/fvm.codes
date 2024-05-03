@@ -33,7 +33,7 @@ const columns = (isPrecompiled: boolean) => [
     width: 50,
   },
   {
-    Header: !isPrecompiled ? 'Stack Input' : 'Input',
+    Header: !isPrecompiled ? 'Register Input' : 'Input',
     accessor: 'input',
     Cell: ({ value }: { value: string }) => (
       <StackBox
@@ -45,7 +45,7 @@ const columns = (isPrecompiled: boolean) => [
     className: 'hidden lg:table-cell',
   },
   {
-    Header: !isPrecompiled ? 'Stack Output' : 'Output',
+    Header: !isPrecompiled ? 'Output' : 'Output',
     accessor: 'output',
     Cell: ({ value }: { value: string }) => (
       <StackBox

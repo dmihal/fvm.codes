@@ -43,7 +43,7 @@ module.exports = withPlausibleProxy()({
       process: require.resolve('process/browser'),
       assert: require.resolve('assert/'),
       events: require.resolve('events/'),
-      buffer: require.resolve('buffer/'),
+      // buffer: require.resolve('buffer/'),
     }
     // NOTE: Needed because rustbn used by ethereumjs is having a top level await
     config.experiments.topLevelAwait = true
